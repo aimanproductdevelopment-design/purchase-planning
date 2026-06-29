@@ -1,0 +1,82 @@
+# ============================================================
+#  APPS — Aiman Purchase Planning System
+#  Configuration File
+# ============================================================
+
+jst:
+  mode: "xlsx"          # xlsx | csv | api | db
+  connection:
+    sku_master:      "data/sku_master.xlsx"
+    sales_history:   "data/sales_history.xlsx"
+    stock_on_hand:   "data/stock_on_hand.xlsx"
+    pending_po:      "data/pending_po.xlsx"
+
+  # ชื่อคอลัมน์จาก JST (ภาษาไทย) → ชื่อมาตรฐาน
+  field_map:
+    sku:
+      "รหัสSKU":       "sku_id"
+      "ชื่อสินค้า":    "sku_name"
+      "หน่วย":         "uom"
+      "ราคาต้นทุน":    "unit_cost"
+      "หมวดหมู่":      "category"
+    sales:
+      "รหัสสินค้า":              "sku_id"
+      "จํานวนสินค้าที่ขาย":     "qty_sold_total"   # aggregated total, not daily
+      "จำนวนสินค้าที่ขาย":      "qty_sold_total"   # alternate encoding
+      "จำนวนคำสั่งซื้อที่ขาย":  "order_count"
+    stock:
+      "รหัสSKU":         "sku_id"
+      "จำนวนคงเหลือ":    "on_hand"       # AvailableQty จาก GetSkuInventorys
+      "จำนวนทั้งหมด":    "total_qty"     # Qty (รวม lock)
+      "ล็อคคำสั่งซื้อ":  "order_lock"
+      "ล็อคร้านค้า":     "shop_lock"
+      "สั่งซื้อค้างรับ": "on_order_wms"  # PurchaseQty
+      "Safety Stock":    "safety_stock_wms"
+      "ยอดขาย7วัน":     "sales_7d"
+      "ยอดขาย30วัน":    "sales_30d"
+    po:
+      "เลขที่PO":        "po_number"
+      "รหัสSKU":         "sku_id"
+      "สถานะ":          "status"
+      "จำนวนสั่งซื้อ":   "qty_ordered"
+      "จำนวนรับแล้ว":    "qty_received"
+      "วันที่รับสินค้า":  "eta_date"
+      "ชื่อSupplier":     "supplier_name"
+
+  # จำนวนวันในประวัติการขาย (ใช้คำนวณ avg daily จาก total)
+  sales_history_days: 430
+
+forecast:
+  method: "ma_seasonal"      # ma_seasonal | wma
+  windows:
+    w30: 0.5
+    w60: 0.3
+    w90: 0.2
+  min_history_days_seasonal: 395   # ~13 months
+  stockout_handling: "exclude"     # exclude | impute
+  outlier_sigma: 3.0
+
+safety_stock:
+  global_mode: "statistical"       # statistical | days_of_cover
+  lead_time_variable: false        # true = สูตร A+ คิด σ lead time
+  service_level: 0.95              # 90%=1.28 | 95%=1.65 | 97.5%=1.96 | 99%=2.33
+  default_safety_days: 14          # ใช้เมื่อ mode = days_of_cover
+  min_safety_stock: 0
+
+lead_time:
+  default_lead_time_days: 30
+  by_supplier: {}
+
+order:
+  review_period_days: 7            # 0 = continuous review
+  use_eoq: false
+  order_cost: 500
+  holding_rate: 0.20
+
+alert:
+  watch_multiplier: 1.5
+  overstock_days: 120
+  max_order_cap: {}
+
+# override รายสินค้า (ชนะทุกระดับ)
+per_sku: {}

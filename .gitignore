@@ -1,0 +1,26 @@
+# Credentials — ห้าม commit เด็ดขาด
+auto_export/.env
+*.env
+
+# Data & output (สร้างใหม่จาก export)
+data/
+output/
+
+# Probe / diagnostic files
+auto_export/probe_*.py
+auto_export/probe_*.json
+auto_export/_to_delete/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.Python
+*.egg-info/
+
+# Logs
+logs/
+screenshots/
+
+# OS
+.DS_Store

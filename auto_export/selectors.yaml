@@ -1,0 +1,43 @@
+# ============================================================
+#  APPS — JST API Config
+#  ค้นพบ endpoints จริงจาก JST ERP (ไม่ต้องแก้ selectors อีกต่อไป)
+#  เพราะ jst_exporter.py ใช้ API โดยตรงหลัง login
+# ============================================================
+
+web_urls:
+  base:           "https://asia-web.jsterp.com/"
+  sku_page:       "https://asia-web.jsterp.com/Item/Goods/Item/ItemManager"
+  sales_page:     "https://asia-web.jsterp.com/ReportCenter/SalesTheme/index"
+  stock_page:     "https://asia.jsterp.com/Wms/Inventory/SkuInventory"
+  po_page:        "https://asia.jsterp.com/PurchaseOrder/Purchase/List"
+
+api:
+  base_url:       "https://asia.jsterp.com"
+
+  sku_master:
+    endpoint:     "/Common/FileExport/AsyncExport"
+    relative_id:  "Item"
+    output_file:  "sku_master.xlsx"
+
+  sales_history:
+    endpoint:     "/Common/FileExport/AsyncExport"
+    relative_id:  "NewSaleOrderItem"
+    date_range_days: 430
+    output_file:  "sales_history.xlsx"
+
+  stock_on_hand:
+    endpoint:     "/Common/FileExport/AsyncExport"
+    relative_id:  "SkuInventory"
+    output_file:  "stock_on_hand.xlsx"
+
+  pending_po:
+    endpoint:     "/PurchaseOrder/Purchase/Download"
+    output_file:  "pending_po.xlsx"
+
+  download_file:
+    endpoint:     "/Common/FileImport/DownloadExportFile"
+
+login:
+  username_field: "input[placeholder*='账号'], input[name='loginName'], input[type='text']"
+  password_field: "input[placeholder*='密码'], input[name='loginPwd'], input[type='password']"
+  submit_button:  "button[type='submit'], button:has-text('登录'), .login-btn"

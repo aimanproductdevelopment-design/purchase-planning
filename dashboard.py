@@ -631,133 +631,52 @@ if st.session_state.confirmed:
     }).sort_values(["Supplier", "ชื่อสินค้า"])
     st.dataframe(disp, use_container_width=True, hide_index=True)
 
-    # ── Export Excel ─────────────────────────────────────────────
+    # ── Export Excel (JST Import Format) ────────────────────────
     def build_po_excel(confirmed_list: list) -> bytes:
         from openpyxl import Workbook
-        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-        from openpyxl.utils import get_column_letter
 
-        wb   = Workbook()
+        wb = Workbook()
         wb.remove(wb.active)
-        NAVY, GREEN, GOLD, LIGHT = "2F4F8F", "1a5c2a", "FFD700", "EAF4FF"
-        thin = Border(
-            left=Side(style="thin", color="CCCCCC"), right=Side(style="thin", color="CCCCCC"),
-            top=Side(style="thin", color="CCCCCC"),  bottom=Side(style="thin", color="CCCCCC"),
-        )
-        today_str = datetime.now().strftime("%d/%m/%Y")
 
-        # summary sheet
-        ws_sum = wb.create_sheet("📋 สรุปรวม")
-        ws_sum.merge_cells("A1:F1")
-        ws_sum["A1"] = f"ใบสั่งซื้อรวม  |  วันที่: {today_str}"
-        ws_sum["A1"].font      = Font(bold=True, size=14, color="FFFFFF")
-        ws_sum["A1"].fill      = PatternFill("solid", fgColor=GREEN)
-        ws_sum["A1"].alignment = Alignment(horizontal="center", vertical="center")
-        ws_sum.row_dimensions[1].height = 30
+        # ── Sheet1: JST import format ──────────────────────────────
+        ws1 = wb.create_sheet("Sheet1")
+        JST_HEADERS = [
+            "คลังสินค้า", "SKU สินค้า", "จำนวน", "พื้นที่คลังสินค้า",
+            "ซัพพลายเออร์", "ราคาต่อหน่วย(สกุลเงินต่างประเทศ)", "ราคาต่อหน่วย",
+            "ประเทศ", "ภูมิภาค", "จังหวัด", "อำเภอ", "รายละเอียดสถานที่",
+            "จำนวนสินค้าที่คาดว่าจะถึง", "เวลาซื้อของ", "วันที่คาดว่าสินค้าจะถึง",
+            "หมายเหตุสำหรับใบจัดซื้อ", "อัตราสินค้าเกินสูงสุด", "ภาษี",
+            "บริษัทขนส่ง", "หมายเลขพัสดุ", "ค่าจัดส่ง", "วิธีจัดส่ง",
+            "ค่าธรรมเนียมอื่นๆ", "วิธีแบ่งสรรค่าใช้จ่าย", "ผู้จัดซื้อสินค้า", "เลขที่ภายนอก",
+        ]
+        ws1.append(JST_HEADERS)
 
-        hdrs = ["Supplier","SKU ID","ชื่อสินค้า","จำนวนสั่ง (ชิ้น)","ราคา/ชิ้น (บาท)","มูลค่า (บาท)"]
-        for ci, h in enumerate(hdrs, 1):
-            c = ws_sum.cell(2, ci, h)
-            c.font = Font(bold=True, color="FFFFFF", size=10)
-            c.fill = PatternFill("solid", fgColor=NAVY)
-            c.alignment = Alignment(horizontal="center", vertical="center")
-            c.border = thin
+        for item in sorted(confirmed_list, key=lambda x: (x["supplier"], x["sku_id"])):
+            row = [""] * 26
+            row[0]  = "Aiman Shop-ขายเอง"   # คลังสินค้า
+            row[1]  = item["sku_id"]         # SKU สินค้า
+            row[2]  = item["qty"]             # จำนวน
+            row[3]  = "In"                   # พื้นที่คลังสินค้า (คลังสินค้าขาเข้า)
+            row[4]  = item["supplier"]        # ซัพพลายเออร์
+            row[6]  = item["unit_cost"]       # ราคาต่อหน่วย
+            ws1.append(row)
 
-        by_sup = {}
-        for v in sorted(confirmed_list, key=lambda x: (x["supplier"], x["sku_name"])):
-            by_sup.setdefault(v["supplier"], []).append(v)
-
-        ri, grand = 3, 0.0
-        for sup, items in by_sup.items():
-            sup_tot = 0.0
-            for item in items:
-                val = item["qty"] * item["unit_cost"]
-                sup_tot += val; grand += val
-                for ci, v in enumerate([sup, item["sku_id"], item["sku_name"],
-                                         item["qty"], item["unit_cost"], val], 1):
-                    cell = ws_sum.cell(ri, ci, v)
-                    cell.border = thin
-                    cell.fill   = PatternFill("solid", fgColor=LIGHT)
-                    cell.alignment = Alignment(vertical="center",
-                                               horizontal="right" if ci >= 4 else "left")
-                    if ci in (5, 6): cell.number_format = "#,##0.00"
-                    elif ci == 4:    cell.number_format = "#,##0"
-                ri += 1
-            # subtotal
-            for ci in range(1, 7):
-                c = ws_sum.cell(ri, ci)
-                c.border = thin; c.font = Font(bold=True)
-                c.fill = PatternFill("solid", fgColor="D0E8FF")
-                c.alignment = Alignment(horizontal="right", vertical="center")
-            ws_sum.cell(ri, 3, f"รวม {sup}")
-            ws_sum.cell(ri, 4, sum(i["qty"] for i in items)).number_format = "#,##0"
-            ws_sum.cell(ri, 6, sup_tot).number_format = "#,##0.00"
-            ri += 1
-
-        # grand total
-        for ci in range(1, 7):
-            c = ws_sum.cell(ri, ci)
-            c.border = thin
-            c.font = Font(bold=True, size=12, color="FFFFFF")
-            c.fill = PatternFill("solid", fgColor=GREEN)
-            c.alignment = Alignment(horizontal="right", vertical="center")
-        ws_sum.cell(ri, 3, "ยอดรวมทั้งหมด")
-        ws_sum.cell(ri, 4, sum(v["qty"] for v in confirmed_list)).number_format = "#,##0"
-        gc = ws_sum.cell(ri, 6, grand)
-        gc.number_format = "#,##0.00"
-        gc.font = Font(bold=True, size=12, color=GOLD)
-        ws_sum.row_dimensions[ri].height = 28
-        for ci, w in enumerate([22,14,36,18,18,18], 1):
-            ws_sum.column_dimensions[get_column_letter(ci)].width = w
-        ws_sum.freeze_panes = "A3"
-
-        # per-supplier sheets
-        for sup, items in by_sup.items():
-            sn = sup[:28].replace("/","-").replace("\\","-").replace("*","")
-            ws = wb.create_sheet(f"🏭 {sn}")
-            ws.merge_cells("A1:F1")
-            ws["A1"] = f"ใบสั่งซื้อ: {sup}  |  {today_str}"
-            ws["A1"].font = Font(bold=True, size=13, color="FFFFFF")
-            ws["A1"].fill = PatternFill("solid", fgColor=NAVY)
-            ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
-            ws.row_dimensions[1].height = 28
-
-            for ci, h in enumerate(["ลำดับ","SKU ID","ชื่อสินค้า","จำนวนสั่ง (ชิ้น)","ราคา/ชิ้น (บาท)","มูลค่า (บาท)"], 1):
-                c = ws.cell(2, ci, h)
-                c.font = Font(bold=True, color="FFFFFF", size=10)
-                c.fill = PatternFill("solid", fgColor=NAVY)
-                c.alignment = Alignment(horizontal="center", vertical="center")
-                c.border = thin
-
-            sup_tot = 0.0
-            for i, item in enumerate(sorted(items, key=lambda x: x["sku_name"]), 1):
-                val = item["qty"] * item["unit_cost"]; sup_tot += val
-                for ci, v in enumerate([i, item["sku_id"], item["sku_name"],
-                                         item["qty"], item["unit_cost"], val], 1):
-                    c = ws.cell(i+2, ci, v)
-                    c.border = thin
-                    c.fill   = PatternFill("solid", fgColor="F7FBFF" if i%2==0 else "FFFFFF")
-                    c.alignment = Alignment(vertical="center",
-                                            horizontal="right" if ci>=4 else ("center" if ci==1 else "left"))
-                    if ci in (5,6): c.number_format = "#,##0.00"
-                    elif ci==4:     c.number_format = "#,##0"
-
-            tr = len(items)+3
-            for ci in range(1, 7):
-                c = ws.cell(tr, ci)
-                c.border = thin
-                c.font = Font(bold=True, size=12, color="FFFFFF")
-                c.fill = PatternFill("solid", fgColor=NAVY)
-                c.alignment = Alignment(horizontal="right", vertical="center")
-            ws.cell(tr, 3, "ยอดรวม")
-            ws.cell(tr, 4, sum(i["qty"] for i in items)).number_format = "#,##0"
-            tc = ws.cell(tr, 6, sup_tot)
-            tc.number_format = "#,##0.00"
-            tc.font = Font(bold=True, size=13, color=GOLD)
-            ws.row_dimensions[tr].height = 26
-            for ci, w in enumerate([8,14,36,18,18,18], 1):
-                ws.column_dimensions[get_column_letter(ci)].width = w
-            ws.freeze_panes = "A3"
+        # ── Sheet2: reference table (เหมือนแม่แบบ JST) ─────────────
+        ws2 = wb.create_sheet("Sheet2")
+        ref_data = [
+            ("WarehouseArea", "คลังหลัก",          "Main"),
+            ("WarehouseArea", "คลังสินค้าคืน",     "SaleReturn"),
+            ("WarehouseArea", "คลังสินค้าขาเข้า",  "In"),
+            ("WarehouseArea", "คลังสินค้าชำรุด",   "Defective"),
+            ("Shipment",      "ทางเรือ",            "sea"),
+            ("Shipment",      "ทางอากาศ",           "air"),
+            ("Shipment",      "ทางบก",              "land"),
+            ("Shipment",      "อื่น ๆ",             "other"),
+            ("Apportionment", "จำนวน",              "Qty"),
+            ("Apportionment", "ราคา",               "Price"),
+        ]
+        for r in ref_data:
+            ws2.append(list(r))
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -768,23 +687,23 @@ if st.session_state.confirmed:
 
     if IS_MOBILE:
         st.download_button(
-            "📥 Export PO Excel (แยก Supplier)",
+            "📥 Export PO (JST Import)",
             data=po_bytes, file_name=fname,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             type="primary", use_container_width=True,
         )
-        st.caption(f"จะได้ {sup_count} sheet (แยกซัพลายเยอร์) + 1 sheet สรุปรวม")
+        st.caption(f"{conf_count} รายการ พร้อม import JST ได้ทันที")
     else:
         c1, c2 = st.columns([1, 2])
         with c1:
             st.download_button(
-                "📥 Export PO Excel (แยก Supplier)",
+                "📥 Export PO (JST Import)",
                 data=po_bytes, file_name=fname,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 type="primary", use_container_width=True,
             )
         with c2:
-            st.info(f"Excel จะมี **{sup_count} sheet** (แยกซัพลายเยอร์) + 1 sheet สรุปรวม")
+            st.info(f"ไฟล์ Excel นี้พร้อม **import เข้า JST ได้ทันที** — {conf_count} รายการ จาก {sup_count} ซัพพลายเยอร์")
 
 else:
     st.info("กด **✅ Confirm สั่ง** บนการ์ดสินค้าด้านบน เพื่อเพิ่มรายการและ Export ใบสั่งซื้อ")

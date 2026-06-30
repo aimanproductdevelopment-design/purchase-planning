@@ -35,6 +35,43 @@ components.html("""
         url.searchParams.set('w', w);
         window.parent.history.replaceState({}, '', url.toString());
     }
+
+    // Replace sidebar toggle button text with hamburger icon
+    function fixSidebarToggle() {
+        const doc = window.parent.document;
+        // Try multiple selectors Streamlit might use
+        const selectors = [
+            '[data-testid="collapsedControl"]',
+            '[data-testid="stSidebarCollapsedControl"]',
+            'button[kind="header"]',
+        ];
+        for (const sel of selectors) {
+            const btns = doc.querySelectorAll(sel);
+            btns.forEach(btn => {
+                // Hide all child text nodes and elements
+                btn.childNodes.forEach(n => {
+                    if (n.nodeType === Node.TEXT_NODE) n.textContent = '';
+                });
+                btn.querySelectorAll('*').forEach(el => {
+                    el.style.setProperty('display', 'none', 'important');
+                });
+                // Set hamburger if not already set
+                if (!btn.getAttribute('data-hamburger')) {
+                    btn.setAttribute('data-hamburger', '1');
+                    btn.style.setProperty('font-size', '20px', 'important');
+                    btn.style.setProperty('display', 'flex', 'important');
+                    btn.style.setProperty('align-items', 'center', 'important');
+                    btn.style.setProperty('justify-content', 'center', 'important');
+                    const icon = doc.createTextNode('☰');
+                    btn.appendChild(icon);
+                }
+            });
+        }
+    }
+    // Run on load and after short delays (Streamlit renders async)
+    setTimeout(fixSidebarToggle, 500);
+    setTimeout(fixSidebarToggle, 1500);
+    setTimeout(fixSidebarToggle, 3000);
 })();
 </script>
 """, height=0)
@@ -73,26 +110,7 @@ st.markdown(f"""
 /* ── hide streamlit chrome ── */
 {_mob_hide}
 
-/* ── sidebar toggle button: hide text, show ☰ ── */
-[data-testid="collapsedControl"] {{
-    overflow: hidden !important;
-    width: 2.2rem !important;
-    height: 2.2rem !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 0 !important;
-}}
-[data-testid="collapsedControl"]::after {{
-    content: '☰' !important;
-    font-size: 20px !important;
-    color: #555 !important;
-    line-height: 1 !important;
-}}
-[data-testid="collapsedControl"] svg,
-[data-testid="collapsedControl"] button > span {{
-    display: none !important;
-}}
+/* ── sidebar toggle: hide via JS below ── */
 
 /* ── block container ── */
 .block-container {{

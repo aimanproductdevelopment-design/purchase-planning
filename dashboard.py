@@ -656,7 +656,7 @@ if st.session_state.confirmed:
             row[0]  = "Aiman Shop-ขายเอง"   # คลังสินค้า
             row[1]  = item["sku_id"]         # SKU สินค้า
             row[2]  = item["qty"]             # จำนวน
-            row[3]  = "In"                   # พื้นที่คลังสินค้า (คลังสินค้าขาเข้า)
+            row[3]  = "Main"                # พื้นที่คลังสินค้า (คลังหลัก)
             row[4]  = item["supplier"]        # ซัพพลายเออร์
             row[6]  = item["unit_cost"]       # ราคาต่อหน่วย
             ws1.append(row)

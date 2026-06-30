@@ -1,9 +1,16 @@
 """
 APPS — Alert Engine
 จัดระดับความเร่งด่วน 5 ระดับ จาก Days of Supply เทียบ Lead Time
+
+กฎพิเศษ:
+- SKU ที่ไม่มียอดขาย 60-90 วัน (forecast ≈ 0) → OVERSTOCK เสมอ
+  เพราะถ้าไม่มีคนซื้อ ของจะหมดหรือเหลือน้อยก็ไม่ต้องสั่งเพิ่ม
 """
-from models.schema import ReorderResult, SafetyStockResult, AlertResult
+from models.schema import ReorderResult, SafetyStockResult, AlertResult, ForecastResult
 from models.config_loader import AppConfig
+
+# ถ้า forecast ต่ำกว่านี้ถือว่า "ไม่มียอดขาย" (ขายน้อยกว่า 1 ชิ้นต่อ 90 วัน)
+_NO_SALES_THRESHOLD = 1.0 / 90
 
 
 LEVELS = ["CRITICAL", "WARNING", "WATCH", "OK", "OVERSTOCK"]
@@ -23,12 +30,21 @@ def compute_alert(
     ss: SafetyStockResult,
     lead_time_days: int,
     cfg: AppConfig,
+    fc: ForecastResult = None,
 ) -> AlertResult:
 
     dos = reorder.days_of_supply
     available = reorder.available
     ss_val = ss.safety_stock
     on_order = reorder.on_order
+
+    # ── กฎพิเศษ: ไม่มียอดขายใน 60-90 วัน → OVERSTOCK เสมอ ──────────────
+    if fc is not None and fc.daily < _NO_SALES_THRESHOLD:
+        return AlertResult(
+            sku_id=sku_id,
+            level="OVERSTOCK",
+            message=f"⚫ ไม่มียอดขาย (forecast={fc.daily:.4f}/วัน) — ไม่ต้องสั่ง",
+        )
 
     if available <= ss_val or dos <= lead_time_days:
         level = "CRITICAL"

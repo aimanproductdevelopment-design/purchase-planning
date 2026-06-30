@@ -123,6 +123,10 @@ def run(steps: list = None, headless: bool = None):
         results["sales"] = path
         print(f"   ✅ {path}")
 
+        print("\n[3b] 📊 Export ยอดขายแยกช่วง 3/7/15/30/60/90 วัน...")
+        window_results = export_sales_windows(session)
+        results["sales_windows"] = window_results
+
     if "stock" in steps:
         print("\n[4] 🏭 Export Stock on Hand...")
         try:
@@ -246,8 +250,9 @@ def _export_sku(session: requests.Session) -> str:
     return _async_export_and_download(session, payload, "sku_master.xlsx")
 
 
-def _export_sales(session: requests.Session, start_date: str, end_date: str) -> str:
-    """Export Sales History by SKU → sales_history.xlsx
+def _export_sales(session: requests.Session, start_date: str, end_date: str,
+                  filename: str = "sales_history.xlsx") -> str:
+    """Export Sales History by SKU
 
     Payload structure confirmed by browser capture from /ReportCenter/SalesTheme/item
     Dates must be ISO format: "YYYY-MM-DDT00:00:00.000Z"
@@ -295,7 +300,31 @@ def _export_sales(session: requests.Session, start_date: str, end_date: str) -> 
         },
         "exportJTableConfigs": SALES_ITEM_COLUMNS,
     }
-    return _async_export_and_download(session, payload, "sales_history.xlsx")
+    return _async_export_and_download(session, payload, filename)
+
+
+def export_sales_windows(session: requests.Session) -> dict:
+    """
+    Export sales totals per SKU for each window: 3, 7, 15, 30, 60, 90 days.
+    บันทึกเป็น ../data/sales_{n}d.xlsx แต่ละไฟล์
+    คืน dict: {"3d": path, "7d": path, ...}
+    """
+    today = date.today()
+    windows = [(3, "3d"), (7, "7d"), (15, "15d"), (30, "30d"), (60, "60d"), (90, "90d")]
+    results = {}
+    for days, key in windows:
+        start = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+        end   = today.strftime("%Y-%m-%d")
+        fname = f"sales_{key}.xlsx"
+        print(f"   📅 Export ยอดขาย {days} วัน ({start} → {end})...")
+        try:
+            path = _export_sales(session, start, end, filename=fname)
+            results[key] = path
+            print(f"      ✅ {path}")
+        except Exception as e:
+            print(f"      ⚠️  sales_{key} ล้มเหลว: {e}")
+            results[key] = None
+    return results
 
 
 def _export_stock(session: requests.Session) -> str:

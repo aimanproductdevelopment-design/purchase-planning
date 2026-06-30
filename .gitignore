@@ -2,9 +2,12 @@
 auto_export/.env
 *.env
 
-# Data & output (สร้างใหม่จาก export)
+# Data (raw exports จาก JST — สร้างใหม่ได้ทุกครั้ง)
 data/
-output/
+
+# Output — ยกเว้น purchasing_plan.xlsx ที่ dashboard ต้องการ
+output/*
+!output/purchasing_plan.xlsx
 
 # Probe / diagnostic files
 auto_export/probe_*.py

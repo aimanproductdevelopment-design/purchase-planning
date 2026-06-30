@@ -86,6 +86,14 @@ class AppConfig:
         return self._raw["order"]["review_period_days"]
 
     @property
+    def order_window_weights(self) -> dict:
+        """น้ำหนักแต่ละ window ในการคำนวณ daily rate จาก JST sales
+        Return: {"w3": 0.10, "w7": 0.15, "w15": 0.20, "w30": 0.25, "w60": 0.20, "w90": 0.10}
+        """
+        defaults = {"w3": 0.10, "w7": 0.15, "w15": 0.20, "w30": 0.25, "w60": 0.20, "w90": 0.10}
+        return self._raw.get("order", {}).get("window_weights", defaults)
+
+    @property
     def watch_multiplier(self) -> float:
         return self._raw["alert"]["watch_multiplier"]
 

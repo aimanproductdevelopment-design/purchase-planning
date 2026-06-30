@@ -61,6 +61,14 @@ def run(config_path: str = "config.yaml", output_path: str = "output/purchasing_
     for s in sales:
         sales_by_sku[s.sku_id].append(s)
 
+    # ดึงยอดขายจริงแต่ละช่วงจากไฟล์ sales_{n}d.xlsx ที่ exportแยกไว้
+    print("  ดึงยอดขายแยกช่วง 3/7/15/30/60/90 วันจากไฟล์ JST...")
+    sales_window: Dict[str, dict] = adapter.get_sales_windows()
+    if not sales_window:
+        print("  ⚠️  ไม่พบไฟล์ sales window — ใช้ค่าศูนย์ (รัน jst_exporter เพื่อเติมข้อมูล)")
+    else:
+        print(f"  ✅ ได้ยอดขายจริง {len(sales_window)} SKU")
+
     print("\n[3/5] คำนวณ Forecast / Safety Stock / ROP / Order Qty...")
     results: List[PlanningOutput] = []
 
@@ -73,8 +81,9 @@ def run(config_path: str = "config.yaml", output_path: str = "output/purchasing_
         ss = compute_safety_stock(sku, fc, lead_time, cfg)
         stock = stock_map.get(sku.sku_id) or StockRecord(sku_id=sku.sku_id, on_hand=0.0)
         reorder = compute_reorder(sku.sku_id, stock, po_map.get(sku.sku_id, []), fc, ss, lead_time)
-        order = compute_order_qty(sku, fc, reorder, lead_time, cfg)
-        alert = compute_alert(sku.sku_id, reorder, ss, lead_time, cfg)
+        order = compute_order_qty(sku, fc, reorder, lead_time, cfg,
+                                   sales_window=sales_window.get(sku.sku_id))
+        alert = compute_alert(sku.sku_id, reorder, ss, lead_time, cfg, fc=fc)
 
         results.append(PlanningOutput(
             sku=sku, forecast=fc, safety_stock=ss,
@@ -93,17 +102,104 @@ def run(config_path: str = "config.yaml", output_path: str = "output/purchasing_
             print(f"  {lvl}: {level_count[lvl]} SKU")
 
     print(f"\n[5/5] บันทึก Excel → {output_path}")
-    _export_excel(results, output_path, snapshot_at)
+    _export_excel(results, output_path, snapshot_at, sales_window)
+
+    print("\n[6/6] LINE Notify...")
+    try:
+        from notify.line_notify import send_summary
+        send_summary(results, output_path=output_path)
+    except Exception as e:
+        print(f"   ⚠️  LINE Notify ข้าม: {e}")
+
     print("\n✅ เสร็จสิ้น!")
     return results
 
 
-def _export_excel(results: List[PlanningOutput], path: str, snapshot_at: str):
-    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+# ── สีตามระดับ Alert ─────────────────────────────────────────────
+_ALERT_BG = {
+    "CRITICAL":  "FFCCCC",
+    "WARNING":   "FFE5CC",
+    "WATCH":     "FFFACC",
+    "OK":        "CCFFCC",
+    "OVERSTOCK": "E0E0E0",
+}
+_HEADER_BG = "2F4F8F"
+_HEADER_FG = "FFFFFF"
 
-    rows_rec = []
-    rows_alert = []
-    rows_audit = []
+
+def _make_row(r, sales_window: dict = None) -> dict:
+    sw = (sales_window or {}).get(r.sku.sku_id, {})
+    return {
+        "Alert":                r.alert.level,
+        "SKU ID":               r.sku.sku_id,
+        "ชื่อสินค้า":           r.sku.sku_name,
+        "หมวด":                 r.sku.category,
+        "Supplier":             r.sku.supplier_id,
+        "Lead Time (วัน)":      r.lead_time_used,
+        "คงเหลือ":              round(r.reorder.available, 0),
+        "ขาย 3 วัน":            sw.get("s3", 0),
+        "ขาย 7 วัน":            sw.get("s7", 0),
+        "ขาย 15 วัน":           sw.get("s15", 0),
+        "ขาย 30 วัน":           sw.get("s30", 0),
+        "ขาย 60 วัน":           sw.get("s60", 0),
+        "ขาย 90 วัน":           sw.get("s90", 0),
+        "PO ค้างรับ":           round(r.reorder.on_order, 0),
+        "Inv. Position":        round(r.reorder.inventory_position, 0),
+        "Forecast/วัน":         round(r.forecast.daily, 2),
+        "Days of Supply":       round(r.reorder.days_of_supply, 1),
+        "Safety Stock":         round(r.safety_stock.safety_stock, 0),
+        "Reorder Point":        round(r.reorder.rop, 0),
+        "ต้องสั่ง?":            "ใช่" if r.reorder.need_to_order else "",
+        "ราคาต้นทุน (บาท)":     round(r.sku.unit_cost, 2),
+        "แนะนำสั่ง (หน่วย)":    int(r.order_qty.suggested_qty) if r.order_qty.suggested_qty > 0 else "",
+        "มูลค่าสั่ง (บาท)":     round(r.order_qty.suggested_qty * r.sku.unit_cost, 2)
+                                 if r.order_qty.suggested_qty > 0 else "",
+        "หมายเหตุ":             r.alert.message or r.order_qty.reason,
+    }
+
+
+def _style_sheet(ws, df: pd.DataFrame, alert_col: str = "Alert"):
+    from openpyxl.styles import PatternFill, Font, Alignment
+    from openpyxl.utils import get_column_letter
+
+    header_fill = PatternFill("solid", fgColor=_HEADER_BG)
+    header_font = Font(color=_HEADER_FG, bold=True, size=10)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    alert_col_idx = None
+    for i, col in enumerate(df.columns, 1):
+        if col == alert_col:
+            alert_col_idx = i
+            break
+
+    if alert_col_idx:
+        for row_idx in range(2, ws.max_row + 1):
+            level = ws.cell(row_idx, alert_col_idx).value or ""
+            bg = _ALERT_BG.get(level, "FFFFFF")
+            fill = PatternFill("solid", fgColor=bg)
+            for col_idx in range(1, ws.max_column + 1):
+                cell = ws.cell(row_idx, col_idx)
+                cell.fill = fill
+                cell.alignment = Alignment(vertical="center")
+
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+
+    for col_idx, col in enumerate(df.columns, 1):
+        letter = get_column_letter(col_idx)
+        max_len = len(str(col))
+        for cell in ws.iter_rows(min_row=2, min_col=col_idx, max_col=col_idx):
+            max_len = max(max_len, len(str(cell[0].value or "")))
+        ws.column_dimensions[letter].width = min(max_len + 3, 45)
+
+    ws.row_dimensions[1].height = 28
+
+
+def _export_excel(results: List[PlanningOutput], path: str, snapshot_at: str, sales_window: dict = None):
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
 
     level_order = {l: i for i, l in enumerate(LEVELS)}
     sorted_results = sorted(
@@ -111,77 +207,52 @@ def _export_excel(results: List[PlanningOutput], path: str, snapshot_at: str):
         key=lambda r: (level_order.get(r.alert.level, 99), r.reorder.days_of_supply)
     )
 
+    all_rows    = [_make_row(r, sales_window) for r in sorted_results]
+    critical    = [_make_row(r, sales_window) for r in sorted_results if r.alert.level == "CRITICAL"]
+    watch_warn  = [_make_row(r, sales_window) for r in sorted_results if r.alert.level in ("WARNING", "WATCH")]
+    normal_over = [_make_row(r, sales_window) for r in sorted_results if r.alert.level in ("OK", "OVERSTOCK")]
+
+    audit_rows = []
     for r in sorted_results:
-        rows_rec.append({
-            "Alert": r.alert.level,
-            "SKU ID": r.sku.sku_id,
-            "ชื่อสินค้า": r.sku.sku_name,
-            "หมวด": r.sku.category,
-            "Supplier": r.sku.supplier_id,
-            "คงเหลือ (available)": r.reorder.available,
-            "PO ค้างรับ (on_order)": r.reorder.on_order,
-            "Inv. Position": r.reorder.inventory_position,
-            "Forecast/วัน": r.forecast.daily,
-            "Days of Supply": r.reorder.days_of_supply,
-            "Safety Stock": r.safety_stock.safety_stock,
-            "Reorder Point": r.reorder.rop,
-            "ต้องสั่ง?": "✅ ใช่" if r.reorder.need_to_order else "—",
-            "แนะนำสั่ง (หน่วย)": r.order_qty.suggested_qty if r.order_qty.suggested_qty > 0 else "—",
-            "มูลค่าสั่ง (บาท)": (r.order_qty.suggested_qty * r.sku.unit_cost
-                                   if r.order_qty.suggested_qty > 0 else 0),
-            "หมายเหตุ": r.order_qty.reason,
+        audit_rows.append({
+            "SKU ID":           r.sku.sku_id,
+            "ชื่อสินค้า":       r.sku.sku_name,
+            "snapshot_at":      snapshot_at,
+            "lead_time_used":   r.lead_time_used,
+            "weighted_avg":     round(r.forecast.weighted_add, 4),
+            "seasonal_factor":  round(r.forecast.seasonal_factor, 4),
+            "std_dev_daily":    round(r.forecast.std_dev_daily, 4),
+            "forecast_daily":   round(r.forecast.daily, 4),
+            "forecast_lt":      round(r.forecast.lead_time_forecast, 2),
+            "ss_mode":          r.safety_stock.mode_used,
+            "safety_stock":     round(r.safety_stock.safety_stock, 0),
+            "rop":              round(r.reorder.rop, 0),
+            "available":        round(r.reorder.available, 0),
+            "on_order":         round(r.reorder.on_order, 0),
+            "inv_position":     round(r.reorder.inventory_position, 0),
+            "days_of_supply":   round(r.reorder.days_of_supply, 1),
+            "suggested_qty":    int(r.order_qty.suggested_qty),
+            "alert_level":      r.alert.level,
+            "flags":            ", ".join(r.forecast.flags),
         })
 
-        if r.alert.level in ("CRITICAL", "WARNING"):
-            rows_alert.append({
-                "ระดับ": r.alert.level,
-                "SKU ID": r.sku.sku_id,
-                "ชื่อสินค้า": r.sku.sku_name,
-                "Supplier": r.sku.supplier_id,
-                "Lead Time": r.lead_time_used,
-                "Days of Supply": r.reorder.days_of_supply,
-                "แนะนำสั่ง": r.order_qty.suggested_qty,
-                "ข้อความ": r.alert.message,
-            })
-
-        rows_audit.append({
-            "SKU ID": r.sku.sku_id,
-            "snapshot_at": snapshot_at,
-            "lead_time_used": r.lead_time_used,
-            "weighted_add": r.forecast.weighted_add,
-            "seasonal_factor": r.forecast.seasonal_factor,
-            "std_dev_daily": r.forecast.std_dev_daily,
-            "forecast_daily": r.forecast.daily,
-            "forecast_lead_time": r.forecast.lead_time_forecast,
-            "ss_mode": r.safety_stock.mode_used,
-            "safety_stock": r.safety_stock.safety_stock,
-            "rop": r.reorder.rop,
-            "available": r.reorder.available,
-            "on_order": r.reorder.on_order,
-            "inventory_position": r.reorder.inventory_position,
-            "days_of_supply": r.reorder.days_of_supply,
-            "suggested_qty": r.order_qty.suggested_qty,
-            "alert_level": r.alert.level,
-            "flags": ", ".join(r.forecast.flags),
-        })
-
-    df_rec = pd.DataFrame(rows_rec)
-    df_alert = pd.DataFrame(rows_alert) if rows_alert else pd.DataFrame(
-        columns=["ระดับ", "SKU ID", "ชื่อสินค้า", "Supplier", "ข้อความ"])
-    df_audit = pd.DataFrame(rows_audit)
+    sheets = [
+        ("สั่งด่วน (CRITICAL)",  critical),
+        ("เฝ้าระวัง",            watch_warn),
+        ("ปกติ+OVERSTOCK",       normal_over),
+        ("ทั้งหมด",              all_rows),
+    ]
 
     with pd.ExcelWriter(path, engine="openpyxl") as writer:
-        df_rec.to_excel(writer, sheet_name="คำแนะนำสั่งซื้อ", index=False)
-        df_alert.to_excel(writer, sheet_name="แจ้งเตือน", index=False)
-        df_audit.to_excel(writer, sheet_name="Audit", index=False)
+        for sheet_name, rows in sheets:
+            df = pd.DataFrame(rows) if rows else pd.DataFrame(
+                columns=list(_make_row(results[0], sales_window).keys()) if results else [])
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+            _style_sheet(writer.sheets[sheet_name], df)
 
-        for sheet_name, df in [("คำแนะนำสั่งซื้อ", df_rec),
-                                 ("แจ้งเตือน", df_alert),
-                                 ("Audit", df_audit)]:
-            ws = writer.sheets[sheet_name]
-            for col_idx, col in enumerate(df.columns, 1):
-                max_len = max(len(str(col)), df[col].astype(str).map(len).max() if len(df) > 0 else 0)
-                ws.column_dimensions[ws.cell(1, col_idx).column_letter].width = min(max_len + 3, 40)
+        df_audit = pd.DataFrame(audit_rows)
+        df_audit.to_excel(writer, sheet_name="Audit", index=False)
+        _style_sheet(writer.sheets["Audit"], df_audit, alert_col="alert_level")
 
 
 if __name__ == "__main__":

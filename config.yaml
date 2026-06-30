@@ -14,11 +14,15 @@ jst:
   # ชื่อคอลัมน์จาก JST (ภาษาไทย) → ชื่อมาตรฐาน
   field_map:
     sku:
-      "รหัสSKU":       "sku_id"
-      "ชื่อสินค้า":    "sku_name"
-      "หน่วย":         "uom"
-      "ราคาต้นทุน":    "unit_cost"
-      "หมวดหมู่":      "category"
+      "รหัสSKU":                              "sku_id"
+      "ชื่อสินค้า":                          "sku_name"
+      "หน่วย":                              "uom"
+      "ราคาต้นทุน":                          "unit_cost"
+      "หมวดหมู่":                           "category"
+      "ชื่อผู้จำหน่าย":                    "supplier_id"
+      "จำนวนน้อยสุดในการเติมสินค้า (MIN)":   "moq"
+      "ป้ายกำกับของระบบ":              "status_label"
+      "กำหนดป้ายกำกับเอง":             "status_label"
     sales:
       "รหัสสินค้า":              "sku_id"
       "จํานวนสินค้าที่ขาย":     "qty_sold_total"   # aggregated total, not daily
@@ -64,14 +68,24 @@ safety_stock:
   min_safety_stock: 0
 
 lead_time:
-  default_lead_time_days: 30
-  by_supplier: {}
+  default_lead_time_days: 7
+  by_supplier:
+    "Import From CN": 45   # ผลิต 15วัน + เรือ 30วัน
 
 order:
   review_period_days: 7            # 0 = continuous review
   use_eoq: false
   order_cost: 500
   holding_rate: 0.20
+  # น้ำหนักแต่ละช่วงในการคำนวณ daily rate จาก JST (รวม = 1.0)
+  # ช่วงสั้น = จับ trend ล่าสุด / ช่วงยาว = ความเสถียร
+  window_weights:
+    w3:  0.10   # 3 วัน  — จับ spike ล่าสุด
+    w7:  0.15   # 7 วัน
+    w15: 0.20   # 15 วัน
+    w30: 0.25   # 30 วัน  — น้ำหนักหลัก
+    w60: 0.20   # 60 วัน
+    w90: 0.10   # 90 วัน  — ให้ภาพรวม
 
 alert:
   watch_multiplier: 1.5

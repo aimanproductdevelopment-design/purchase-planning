@@ -29,10 +29,13 @@ components.html("""
 <script>
 (function() {
     const w = window.innerWidth;
+    const ua = navigator.userAgent || '';
+    const isMobileUA = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+    const effectiveW = isMobileUA ? Math.min(w, 500) : w;
     const url = new URL(window.parent.location.href);
     const current = url.searchParams.get('w');
-    if (!current || Math.abs(parseInt(current) - w) > 100) {
-        url.searchParams.set('w', w);
+    if (!current || Math.abs(parseInt(current) - effectiveW) > 100) {
+        url.searchParams.set('w', effectiveW);
         window.parent.history.replaceState({}, '', url.toString());
     }
 

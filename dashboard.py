@@ -70,8 +70,29 @@ st.markdown(f"""
     box-sizing: border-box;
 }}
 
-/* ── hide streamlit chrome on mobile ── */
+/* ── hide streamlit chrome ── */
 {_mob_hide}
+
+/* ── sidebar toggle button: hide text, show ☰ ── */
+[data-testid="collapsedControl"] {{
+    overflow: hidden !important;
+    width: 2.2rem !important;
+    height: 2.2rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0 !important;
+}}
+[data-testid="collapsedControl"]::after {{
+    content: '☰' !important;
+    font-size: 20px !important;
+    color: #555 !important;
+    line-height: 1 !important;
+}}
+[data-testid="collapsedControl"] svg,
+[data-testid="collapsedControl"] button > span {{
+    display: none !important;
+}}
 
 /* ── block container ── */
 .block-container {{
@@ -123,10 +144,11 @@ st.markdown(f"""
     border-radius: {"8px" if IS_MOBILE else "12px"};
     padding: {"10px 8px" if IS_MOBILE else "16px 12px"};
     text-align: center;
-    border: 1.5px solid rgba(0,0,0,0.08);
+    border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07) !important;
 }}
-.stat-box .s-num {{ font-size: {"22px" if IS_MOBILE else "32px"}; font-weight: 800; line-height: 1; }}
-.stat-box .s-lbl {{ font-size: {"10px" if IS_MOBILE else "12px"}; font-weight: 600; margin-top: 4px; }}
+.stat-box .s-num {{ font-size: {"22px" if IS_MOBILE else "32px"}; font-weight: 800; line-height: 1; text-shadow: 0 1px 4px rgba(0,0,0,0.3); }}
+.stat-box .s-lbl {{ font-size: {"10px" if IS_MOBILE else "12px"}; font-weight: 600; margin-top: 4px; color: rgba(255,255,255,0.85); }}
 
 /* ── SECTION TITLE ── */
 .section-title {{
@@ -326,24 +348,24 @@ st.markdown(f"""
 # ── STAT STRIP ────────────────────────────────────────────────────
 st.markdown(f"""
 <div class="stat-strip">
-  <div class="stat-box" style="background:#fff0f0;border-color:#ffc0c0">
-    <div class="s-num" style="color:#e74c3c">{len(critical)}</div>
+  <div class="stat-box">
+    <div class="s-num" style="color:#ff6b6b">{len(critical)}</div>
     <div class="s-lbl">🔴 ด่วน</div>
   </div>
-  <div class="stat-box" style="background:#fff8f0;border-color:#ffd9a0">
-    <div class="s-num" style="color:#e67e22">{len(warning)}</div>
+  <div class="stat-box">
+    <div class="s-num" style="color:#ffa94d">{len(warning)}</div>
     <div class="s-lbl">🟠 เร่งด่วน</div>
   </div>
-  <div class="stat-box" style="background:#f0fff4;border-color:#a0e0b0">
-    <div class="s-num" style="color:#27ae60">{confirmed_count}</div>
+  <div class="stat-box">
+    <div class="s-num" style="color:#51cf66">{confirmed_count}</div>
     <div class="s-lbl">✅ Confirmed</div>
   </div>
-  <div class="stat-box" style="background:#f0f8ff;border-color:#a0c8e0">
-    <div class="s-num" style="color:#2980b9">{len(ok_df)}</div>
+  <div class="stat-box">
+    <div class="s-num" style="color:#74c0fc">{len(ok_df)}</div>
     <div class="s-lbl">🟢 ปกติ</div>
   </div>
-  <div class="stat-box" style="background:#f5f5f5;border-color:#ccc">
-    <div class="s-num" style="color:#888">{len(overstock)}</div>
+  <div class="stat-box">
+    <div class="s-num" style="color:#adb5bd">{len(overstock)}</div>
     <div class="s-lbl">⚪ เกิน</div>
   </div>
 </div>

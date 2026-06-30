@@ -110,6 +110,17 @@ st.markdown(f"""
     box-sizing: border-box;
 }}
 
+/* ── restore Material Symbols font for Streamlit icons (must come after * rule) ── */
+[data-testid="stIconMaterial"] {{
+    font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
+    font-size: 24px !important;
+    font-style: normal !important;
+    font-weight: normal !important;
+    line-height: 1 !important;
+    font-feature-settings: 'liga' 1 !important;
+    -webkit-font-feature-settings: 'liga' 1 !important;
+}}
+
 /* ── hide streamlit chrome ── */
 {_mob_hide}
 

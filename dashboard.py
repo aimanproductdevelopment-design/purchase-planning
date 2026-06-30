@@ -225,6 +225,22 @@ st.markdown(f"""
     border: 1px solid #e8eaf0;
 }}
 
+/* ── FIX EXPANDER OVERLAP ON MOBILE ── */
+[data-testid="stExpander"] summary {{
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 14px !important;
+}}
+[data-testid="stExpander"] summary svg {{
+    flex-shrink: 0 !important;
+    min-width: 16px !important;
+}}
+[data-testid="stExpander"] summary p {{
+    margin: 0 !important;
+    line-height: 1.3 !important;
+}}
+
 /* ── SUPPLIER GROUP HEADER ── */
 .sup-header {{
     font-size: {"12px" if IS_MOBILE else "14px"};

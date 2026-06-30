@@ -110,35 +110,41 @@ st.markdown(f"""
 /* ── hide streamlit chrome ── */
 {_mob_hide}
 
-/* ── sidebar toggle: hide icon-name text, show ☰ ── */
-[data-testid="collapsedControl"] span,
-[data-testid="stSidebarCollapsedControl"] span {{
-    font-size: 0 !important;
-    color: transparent !important;
-    line-height: 0 !important;
-    visibility: hidden !important;
+/* ── Material Symbols font (fix icon-name-as-text on mobile) ── */
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
+.material-symbols-rounded {{
+    font-family: 'Material Symbols Rounded' !important;
+    font-size: 24px !important;
+    font-style: normal !important;
+    font-weight: normal !important;
+    line-height: 1 !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+    word-wrap: normal !important;
+    direction: ltr !important;
+    font-feature-settings: 'liga' !important;
+    -webkit-font-smoothing: antialiased !important;
 }}
-[data-testid="collapsedControl"] svg,
-[data-testid="stSidebarCollapsedControl"] svg {{
-    display: none !important;
+
+/* ── Fallback: hide icon text + show ☰ if font still fails ── */
+[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"],
+[data-testid="stSidebarCollapsedControl"] span,
+[data-testid="collapsedControl"] [data-testid="stIconMaterial"],
+[data-testid="collapsedControl"] span {{
+    overflow: hidden !important;
+    max-width: 0 !important;
+    max-height: 0 !important;
+    display: inline-block !important;
 }}
-[data-testid="collapsedControl"] button,
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="collapsedControl"],
-[data-testid="stSidebarCollapsedControl"] {{
-    position: relative !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}}
-[data-testid="collapsedControl"] button::before,
-[data-testid="stSidebarCollapsedControl"] button::before {{
+[data-testid="stSidebarCollapsedControl"] button::after,
+[data-testid="collapsedControl"] button::after {{
     content: '☰' !important;
-    font-size: 20px !important;
-    color: #aaa !important;
+    font-family: sans-serif !important;
+    font-size: 18px !important;
     line-height: 1 !important;
     display: block !important;
-    visibility: visible !important;
 }}
 
 /* ── block container ── */

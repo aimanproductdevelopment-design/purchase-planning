@@ -113,39 +113,20 @@ st.markdown(f"""
 /* ── hide streamlit chrome ── */
 {_mob_hide}
 
-/* ── Material Symbols font (fix icon-name-as-text on mobile) ── */
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
-.material-symbols-rounded {{
-    font-family: 'Material Symbols Rounded' !important;
-    font-size: 24px !important;
-    font-style: normal !important;
-    font-weight: normal !important;
-    line-height: 1 !important;
-    letter-spacing: normal !important;
-    text-transform: none !important;
-    display: inline-block !important;
-    white-space: nowrap !important;
-    word-wrap: normal !important;
-    direction: ltr !important;
-    font-feature-settings: 'liga' !important;
-    -webkit-font-smoothing: antialiased !important;
-}}
-
-/* ── Fallback: hide icon text + show ☰ if font still fails ── */
-[data-testid="stSidebarCollapsedControl"] [data-testid="stIconMaterial"],
-[data-testid="stSidebarCollapsedControl"] span,
-[data-testid="collapsedControl"] [data-testid="stIconMaterial"],
-[data-testid="collapsedControl"] span {{
+/* ── Sidebar collapse button: hide icon-name text, show ☰ ── */
+[data-testid="stSidebarCollapseButton"] [data-testid="stIconMaterial"] {{
+    font-size: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
     overflow: hidden !important;
-    max-width: 0 !important;
-    max-height: 0 !important;
     display: inline-block !important;
+    visibility: hidden !important;
 }}
-[data-testid="stSidebarCollapsedControl"] button::after,
-[data-testid="collapsedControl"] button::after {{
+[data-testid="stBaseButton-headerNoPadding"]::after {{
     content: '☰' !important;
-    font-family: sans-serif !important;
     font-size: 18px !important;
+    color: rgba(250,250,250,0.7) !important;
+    font-family: sans-serif !important;
     line-height: 1 !important;
     display: block !important;
 }}

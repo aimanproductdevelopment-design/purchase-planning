@@ -661,7 +661,79 @@ if st.session_state.confirmed:
             row[6]  = item["unit_cost"]       # ราคาต่อหน่วย
             ws1.append(row)
 
-        # ── Sheet2: reference table (เหมือนแม่แบบ JST) ─────────────
+        # ── Sheet2: สรุปรายการ (เหมือนแบบเดิม) ────────────────
+        from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+        NAVY, GREEN, GOLD, LIGHT = "2F4F8F", "1a5c2a", "FFD700", "EAF4FF"
+        thin = Border(
+            left=Side(style="thin", color="CCCCCC"), right=Side(style="thin", color="CCCCCC"),
+            top=Side(style="thin", color="CCCCCC"),  bottom=Side(style="thin", color="CCCCCC"),
+        )
+        today_str = datetime.now().strftime("%d/%m/%Y")
+
+        ws_sum = wb.create_sheet("📋 สรุปรวม")
+        ws_sum.merge_cells("A1:F1")
+        ws_sum["A1"] = f"ใบสั่งซื้อรวม  |  วันที่: {today_str}"
+        ws_sum["A1"].font      = Font(bold=True, size=14, color="FFFFFF")
+        ws_sum["A1"].fill      = PatternFill("solid", fgColor=GREEN)
+        ws_sum["A1"].alignment = Alignment(horizontal="center", vertical="center")
+        ws_sum.row_dimensions[1].height = 30
+
+        hdrs = ["Supplier", "SKU ID", "ชื่อสินค้า", "จำนวนสั่ง (ชิ้น)", "ราคา/ชิ้น (บาท)", "มูลค่า (บาท)"]
+        for ci, h in enumerate(hdrs, 1):
+            c = ws_sum.cell(2, ci, h)
+            c.font = Font(bold=True, color="FFFFFF", size=10)
+            c.fill = PatternFill("solid", fgColor=NAVY)
+            c.alignment = Alignment(horizontal="center", vertical="center")
+            c.border = thin
+
+        by_sup = {}
+        for v in sorted(confirmed_list, key=lambda x: (x["supplier"], x["sku_name"])):
+            by_sup.setdefault(v["supplier"], []).append(v)
+
+        ri, grand = 3, 0.0
+        for sup, items in by_sup.items():
+            sup_tot = 0.0
+            for item in items:
+                val = item["qty"] * item["unit_cost"]
+                sup_tot += val; grand += val
+                for ci, v in enumerate([sup, item["sku_id"], item["sku_name"],
+                                        item["qty"], item["unit_cost"], val], 1):
+                    cell = ws_sum.cell(ri, ci, v)
+                    cell.border = thin
+                    cell.fill   = PatternFill("solid", fgColor=LIGHT)
+                    cell.alignment = Alignment(vertical="center",
+                                               horizontal="right" if ci >= 4 else "left")
+                    if ci in (5, 6): cell.number_format = "#,##0.00"
+                    elif ci == 4:    cell.number_format = "#,##0"
+                ri += 1
+            for ci in range(1, 7):
+                c = ws_sum.cell(ri, ci)
+                c.border = thin; c.font = Font(bold=True)
+                c.fill = PatternFill("solid", fgColor="D0E8FF")
+                c.alignment = Alignment(horizontal="right", vertical="center")
+            ws_sum.cell(ri, 3, f"รวม {sup}")
+            ws_sum.cell(ri, 4, sum(i["qty"] for i in items)).number_format = "#,##0"
+            ws_sum.cell(ri, 6, sup_tot).number_format = "#,##0.00"
+            ri += 1
+
+        for ci in range(1, 7):
+            c = ws_sum.cell(ri, ci)
+            c.border = thin
+            c.font = Font(bold=True, size=12, color="FFFFFF")
+            c.fill = PatternFill("solid", fgColor=GREEN)
+            c.alignment = Alignment(horizontal="right", vertical="center")
+        ws_sum.cell(ri, 3, "ยอดรวมทั้งหมด")
+        ws_sum.cell(ri, 4, sum(v["qty"] for v in confirmed_list)).number_format = "#,##0"
+        gc = ws_sum.cell(ri, 6, grand)
+        gc.number_format = "#,##0.00"
+        gc.font = Font(bold=True, size=12, color=GOLD)
+        ws_sum.row_dimensions[ri].height = 28
+        for ci, w in enumerate([22, 14, 36, 18, 18, 18], 1):
+            ws_sum.column_dimensions[get_column_letter(ci)].width = w
+        ws_sum.freeze_panes = "A3"
+
+        # ── Sheet3: JST reference table ────────────────────────────
         ws2 = wb.create_sheet("Sheet2")
         ref_data = [
             ("WarehouseArea", "คลังหลัก",          "Main"),

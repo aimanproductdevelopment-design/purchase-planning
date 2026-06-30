@@ -110,7 +110,36 @@ st.markdown(f"""
 /* ── hide streamlit chrome ── */
 {_mob_hide}
 
-/* ── sidebar toggle: hide via JS below ── */
+/* ── sidebar toggle: hide icon-name text, show ☰ ── */
+[data-testid="collapsedControl"] span,
+[data-testid="stSidebarCollapsedControl"] span {{
+    font-size: 0 !important;
+    color: transparent !important;
+    line-height: 0 !important;
+    visibility: hidden !important;
+}}
+[data-testid="collapsedControl"] svg,
+[data-testid="stSidebarCollapsedControl"] svg {{
+    display: none !important;
+}}
+[data-testid="collapsedControl"] button,
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"] {{
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}}
+[data-testid="collapsedControl"] button::before,
+[data-testid="stSidebarCollapsedControl"] button::before {{
+    content: '☰' !important;
+    font-size: 20px !important;
+    color: #aaa !important;
+    line-height: 1 !important;
+    display: block !important;
+    visibility: visible !important;
+}}
 
 /* ── block container ── */
 .block-container {{

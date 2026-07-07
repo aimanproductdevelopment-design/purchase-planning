@@ -12,7 +12,7 @@ from datetime import datetime
 
 EXCEL_PATH = Path(__file__).parent / "output" / "purchasing_plan.xlsx"
 SHEET_ALL  = "ทั้งหมด"
-SHEET_REC = "คำแนะนำสั่งซื้อ"
+SHEET_REC = "ทั้งหมด"
 
 
 @st.cache_data(ttl=300)
@@ -20,11 +20,17 @@ def load_all_skus() -> pd.DataFrame:
     try:
         df = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_REC)
         df = df.rename(columns={
-            "SKU ID":"sku_id","ชื่อสินค้า":"sku_name","Supplier":"supplier",
-            "Alert":"alert","คงเหลือ (available)":"available",
-            "PO ค้างรับ (on_order)":"on_order","แนะนำสั่ง (หน่วย)":"suggested_qty",
-            "ราคาต่อหน่วย":"unit_cost","มูลค่าสั่ง (บาท)":"order_value",
-            "Days of Supply":"days_of_supply","Forecast/วัน":"forecast_daily",
+            "SKU ID":             "sku_id",
+            "ชื่อสินค้า":         "sku_name",
+            "Supplier":           "supplier",
+            "Alert":              "alert",
+            "คงเหลือ":            "available",
+            "PO ค้างรับ":         "on_order",
+            "แนะนำสั่ง (หน่วย)": "suggested_qty",
+            "ราคาต้นทุน (บาท)":  "unit_cost",
+            "มูลค่าสั่ง (บาท)":  "order_value",
+            "Days of Supply":     "days_of_supply",
+            "Forecast/วัน":       "forecast_daily",
         })
         for c in ("sku_id","sku_name","supplier"):
             df[c] = df[c].astype(str).str.strip()

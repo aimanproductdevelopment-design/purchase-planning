@@ -950,7 +950,8 @@ else:
                                 if qv>0:
                                     if "confirmed" not in st.session_state:
                                         st.session_state["confirmed"] = []
-                                    st.session_state["confirmed"].append({"sku_id":sid,"supplier":sup,"unit_cost":uc,"qty":int(qv),"sku_name":snm})
+                                    _prev=list(st.session_state.get("confirmed") or [])
+                                    st.session_state["confirmed"]=_prev+[{"sku_id":sid,"supplier":sup,"unit_cost":uc,"qty":int(qv),"sku_name":snm}]
                                     st.rerun()
         else:
             tc=len(df_all); nc=(df_all["alert"]=="CRITICAL").sum(); nw=(df_all["alert"]=="WARNING").sum()

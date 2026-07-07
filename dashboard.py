@@ -932,7 +932,7 @@ else:
                     sup=str(row.get("supplier","")); uc=float(row.get("unit_cost",0) or 0)
                     av=float(row.get("available",0) or 0); ds=float(row.get("days_of_supply",0) or 0)
                     al=str(row.get("alert","")); ac=_cm.get(al,"#999")
-                    done=any(c["sku_id"]==sid for c in st.session_state.get("confirmed",[]))
+                    done=sid in (st.session_state.get("confirmed") or {})
                     qk=f"srch_qty_{sid}"
                     if qk not in st.session_state: st.session_state[qk]=1
                     st.markdown(f'''<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 14px;margin-bottom:4px;border-left:4px solid {ac};">
@@ -950,8 +950,9 @@ else:
                                 if qv>0:
                                     if "confirmed" not in st.session_state:
                                         st.session_state["confirmed"] = []
-                                    _prev=list(st.session_state.get("confirmed") or [])
-                                    st.session_state["confirmed"]=_prev+[{"sku_id":sid,"supplier":sup,"unit_cost":uc,"qty":int(qv),"sku_name":snm}]
+                                    _conf=dict(st.session_state.get("confirmed") or {})
+                                    _conf[sid]={"qty":int(qv),"unit_cost":uc,"supplier":sup,"sku_name":snm}
+                                    st.session_state["confirmed"]=_conf
                                     st.rerun()
         else:
             tc=len(df_all); nc=(df_all["alert"]=="CRITICAL").sum(); nw=(df_all["alert"]=="WARNING").sum()

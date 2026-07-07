@@ -902,60 +902,61 @@ if st.session_state.confirmed:
 else:
     st.info("กด **✅ Confirm สั่ง** บนการ์ดสินค้าด้านบน เพื่อเพิ่มรายการและ Export ใบสั่งซื้อ")
 
-    # ── SEARCH & ADD SECTION ─────────────────────────────────────────────────
-    st.markdown("---")
-    st.markdown('<div class="section-title">🔍 ค้นหาและเพิ่มสินค้า</div>',unsafe_allow_html=True)
-    df_all = load_all_skus()
-    if df_all.empty:
-        st.warning("ไม่พบข้อมูลสินค้า — กรุณารัน run_planning.py ก่อน")
-    else:
-        _cm = {"CRITICAL":"#ff6b6b","WARNING":"#ffa94d","OK":"#51cf66","OVERSTOCK":"#adb5bd","WATCH":"#74c0fc"}
-        _sc, _fc = (st.columns([3,1]) if not IS_MOBILE else (st.container(), None))
-        with _sc if not IS_MOBILE else _sc:
-            search_q = st.text_input("ค้นหา",placeholder="พิมพ์ชื่อสินค้าหรือ SKU…",key="search_q",label_visibility="collapsed")
-        show_alert = "ทั้งหมด"
-        if not IS_MOBILE and _fc:
-            with _fc:
-                show_alert = st.selectbox("สถานะ",["ทั้งหมด","CRITICAL","WARNING","OK","OVERSTOCK"],key="srch_alert",label_visibility="collapsed")
-        if search_q.strip():
-            q = search_q.strip()
-            mask = (df_all["sku_id"].str.contains(q,case=False,na=False)|df_all["sku_name"].str.contains(q,case=False,na=False))
-            if show_alert != "ทั้งหมด":
-                mask &= df_all["alert"] == show_alert
-            hits = df_all[mask].head(30).copy()
-            if hits.empty:
-                st.info(f'ไม่พบสินค้าที่ตรงกับ "{q}"')
-            else:
-                st.caption(f"พบ {len(hits)} รายการ")
-                for _, row in hits.iterrows():
-                    sid=str(row["sku_id"]); snm=str(row.get("sku_name",""))
-                    sup=str(row.get("supplier","")); uc=float(row.get("unit_cost",0) or 0)
-                    av=float(row.get("available",0) or 0); ds=float(row.get("days_of_supply",0) or 0)
-                    al=str(row.get("alert","")); ac=_cm.get(al,"#999")
-                    done=sid in (st.session_state.get("confirmed") or {})
-                    qk=f"srch_qty_{sid}"
-                    if qk not in st.session_state: st.session_state[qk]=1
-                    st.markdown(f'''<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 14px;margin-bottom:4px;border-left:4px solid {ac};">
-                      <span style="font-size:14px;font-weight:700;">{snm}</span>
-                      <span style="font-size:11px;color:#aaa;margin-left:10px;">SKU {sid} · {sup} · คงเหลือ {int(av)} · DoS {int(ds)} วัน · ฿{uc:,.2f} · <span style="color:{ac};font-weight:700;">{al}</span></span>
-                    </div>''',unsafe_allow_html=True)
-                    c1,c2 = (st.columns([1,2]) if IS_MOBILE else st.columns([1,5]))
-                    with c1:
-                        qv=st.number_input("จำนวน",min_value=0,step=1,value=st.session_state[qk],key=qk,label_visibility="collapsed")
-                    with c2:
-                        if done:
-                            st.success("✅ อยู่ในรายการแล้ว")
-                        else:
-                            if st.button(f"➕ เพิ่ม {snm[:20]}",key=f"add_{sid}",use_container_width=IS_MOBILE):
-                                if qv>0:
-                                    if "confirmed" not in st.session_state:
-                                        st.session_state["confirmed"] = []
-                                    _conf=dict(st.session_state.get("confirmed") or {})
-                                    _conf[sid]={"sku_id":sid,"qty":int(qv),"unit_cost":uc,"supplier":sup,"sku_name":snm,"มูลค่า (บาท)":int(qv)*uc}
-                                    st.session_state["confirmed"]=_conf
-                                    st.rerun()
+
+# ── SEARCH & ADD SECTION ─────────────────────────────────────────────────
+st.markdown("---")
+st.markdown('<div class="section-title">🔍 ค้นหาและเพิ่มสินค้า</div>',unsafe_allow_html=True)
+df_all = load_all_skus()
+if df_all.empty:
+    st.warning("ไม่พบข้อมูลสินค้า — กรุณารัน run_planning.py ก่อน")
+else:
+    _cm = {"CRITICAL":"#ff6b6b","WARNING":"#ffa94d","OK":"#51cf66","OVERSTOCK":"#adb5bd","WATCH":"#74c0fc"}
+    _sc, _fc = (st.columns([3,1]) if not IS_MOBILE else (st.container(), None))
+    with _sc if not IS_MOBILE else _sc:
+        search_q = st.text_input("ค้นหา",placeholder="พิมพ์ชื่อสินค้าหรือ SKU…",key="search_q",label_visibility="collapsed")
+    show_alert = "ทั้งหมด"
+    if not IS_MOBILE and _fc:
+        with _fc:
+            show_alert = st.selectbox("สถานะ",["ทั้งหมด","CRITICAL","WARNING","OK","OVERSTOCK"],key="srch_alert",label_visibility="collapsed")
+    if search_q.strip():
+        q = search_q.strip()
+        mask = (df_all["sku_id"].str.contains(q,case=False,na=False)|df_all["sku_name"].str.contains(q,case=False,na=False))
+        if show_alert != "ทั้งหมด":
+            mask &= df_all["alert"] == show_alert
+        hits = df_all[mask].head(30).copy()
+        if hits.empty:
+            st.info(f'ไม่พบสินค้าที่ตรงกับ "{q}"')
         else:
-            tc=len(df_all); nc=(df_all["alert"]=="CRITICAL").sum(); nw=(df_all["alert"]=="WARNING").sum()
-            no=(df_all["alert"]=="OK").sum(); nv=(df_all["alert"]=="OVERSTOCK").sum()
-            st.caption(f"📦 {tc} SKU ทั้งหมด — 🔴 {nc} CRITICAL · 🟠 {nw} WARNING · 🟢 {no} OK · ⚪ {nv} OVERSTOCK")
+            st.caption(f"พบ {len(hits)} รายการ")
+            for _, row in hits.iterrows():
+                sid=str(row["sku_id"]); snm=str(row.get("sku_name",""))
+                sup=str(row.get("supplier","")); uc=float(row.get("unit_cost",0) or 0)
+                av=float(row.get("available",0) or 0); ds=float(row.get("days_of_supply",0) or 0)
+                al=str(row.get("alert","")); ac=_cm.get(al,"#999")
+                done=sid in (st.session_state.get("confirmed") or {})
+                qk=f"srch_qty_{sid}"
+                if qk not in st.session_state: st.session_state[qk]=1
+                st.markdown(f'''<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 14px;margin-bottom:4px;border-left:4px solid {ac};">
+                  <span style="font-size:14px;font-weight:700;">{snm}</span>
+                  <span style="font-size:11px;color:#aaa;margin-left:10px;">SKU {sid} · {sup} · คงเหลือ {int(av)} · DoS {int(ds)} วัน · ฿{uc:,.2f} · <span style="color:{ac};font-weight:700;">{al}</span></span>
+                </div>''',unsafe_allow_html=True)
+                c1,c2 = (st.columns([1,2]) if IS_MOBILE else st.columns([1,5]))
+                with c1:
+                    qv=st.number_input("จำนวน",min_value=0,step=1,value=st.session_state[qk],key=qk,label_visibility="collapsed")
+                with c2:
+                    if done:
+                        st.success("✅ อยู่ในรายการแล้ว")
+                    else:
+                        if st.button(f"➕ เพิ่ม {snm[:20]}",key=f"add_{sid}",use_container_width=IS_MOBILE):
+                            if qv>0:
+                                if "confirmed" not in st.session_state:
+                                    st.session_state["confirmed"] = []
+                                _conf=dict(st.session_state.get("confirmed") or {})
+                                _conf[sid]={"sku_id":sid,"qty":int(qv),"unit_cost":uc,"supplier":sup,"sku_name":snm,"มูลค่า (บาท)":int(qv)*uc}
+                                st.session_state["confirmed"]=_conf
+                                st.rerun()
+    else:
+        tc=len(df_all); nc=(df_all["alert"]=="CRITICAL").sum(); nw=(df_all["alert"]=="WARNING").sum()
+        no=(df_all["alert"]=="OK").sum(); nv=(df_all["alert"]=="OVERSTOCK").sum()
+        st.caption(f"📦 {tc} SKU ทั้งหมด — 🔴 {nc} CRITICAL · 🟠 {nw} WARNING · 🟢 {no} OK · ⚪ {nv} OVERSTOCK")
 

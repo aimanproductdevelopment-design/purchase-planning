@@ -951,7 +951,7 @@ else:
                                     if "confirmed" not in st.session_state:
                                         st.session_state["confirmed"] = []
                                     _conf=dict(st.session_state.get("confirmed") or {})
-                                    _conf[sid]={"qty":int(qv),"unit_cost":uc,"supplier":sup,"sku_name":snm}
+                                    _conf[sid]={"sku_id":sid,"qty":int(qv),"unit_cost":uc,"supplier":sup,"sku_name":snm,"มูลค่า (บาท)":int(qv)*uc}
                                     st.session_state["confirmed"]=_conf
                                     st.rerun()
         else:

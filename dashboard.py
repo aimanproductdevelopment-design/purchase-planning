@@ -948,7 +948,9 @@ else:
                         else:
                             if st.button(f"➕ เพิ่ม {snm[:20]}",key=f"add_{sid}",use_container_width=IS_MOBILE):
                                 if qv>0:
-                                    st.session_state.setdefault("confirmed",[]).append({"sku_id":sid,"supplier":sup,"unit_cost":uc,"qty":int(qv),"sku_name":snm})
+                                    if "confirmed" not in st.session_state:
+                                        st.session_state["confirmed"] = []
+                                    st.session_state["confirmed"].append({"sku_id":sid,"supplier":sup,"unit_cost":uc,"qty":int(qv),"sku_name":snm})
                                     st.rerun()
         else:
             tc=len(df_all); nc=(df_all["alert"]=="CRITICAL").sum(); nw=(df_all["alert"]=="WARNING").sum()

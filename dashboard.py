@@ -13,36 +13,6 @@ from datetime import datetime
 EXCEL_PATH = Path(__file__).parent / "output" / "purchasing_plan.xlsx"
 SHEET_ALL  = "ทั้งหมด"
 
-SHEET_REC = "คำแนะนำสั่งซื้อ"
-
-@st.cache_data(ttl=300)
-def load_all_skus() -> pd.DataFrame:
-    try:
-        df = pd.read_excel(EXCEL_PATH, sheet_name=SHEET_REC)
-        df = df.rename(columns={
-            "SKU ID":"sku_id","ชื่อสินค้า":"sku_name","Supplier":"supplier",
-            "Alert":"alert","คงเหลือ (available)":"available",
-            "แนะนำสั่ง (หน่วย)":"suggested_qty","ราคาต่อหน่วย":"unit_cost",
-            "มูลค่าสั่ง (บาท)":"order_value","Days of Supply":"days_of_supply",
-        })
-        df["sku_id"] = df["sku_id"].astype(str).str.strip()
-        df["sku_name"] = df["sku_name"].astype(str).str.strip()
-        df["supplier"] = df["supplier"].astype(str).str.strip()
-        if "unit_cost" not in df.columns:
-            def _c(r):
-                sq = pd.to_numeric(r.get("suggested_qty"), errors="coerce")
-                ov = pd.to_numeric(r.get("order_value"), errors="coerce")
-                return round(ov/sq, 2) if sq and sq > 0 and ov and ov > 0 else 0.0
-            df["unit_cost"] = df.apply(_c, axis=1)
-        else:
-            df["unit_cost"] = pd.to_numeric(df["unit_cost"], errors="coerce").fillna(0.0)
-        df["available"] = pd.to_numeric(df.get("available", 0), errors="coerce").fillna(0)
-        df["days_of_supply"] = pd.to_numeric(df.get("days_of_supply", 0), errors="coerce").fillna(0)
-        return df
-    except Exception:
-        return pd.DataFrame()
-
-
 st.set_page_config(
     page_title="แผนสั่งซื้อ | AIMAN",
     page_icon="📦",
@@ -748,75 +718,7 @@ if st.session_state.confirmed:
     st.dataframe(disp, use_container_width=True, hide_index=True)
 
     # ── Export Excel (JST Import Format) ────────────────────────
-    # ── SEARCH & ADD ────────────────────────────────────────────────────────────
-st.markdown("---")
-st.markdown('<div class="section-title">🔍 ค้นหาและเพิ่มสินค้า</div>', unsafe_allow_html=True)
-df_all = load_all_skus()
-_ACOL = {"CRITICAL":"#ff6b6b","WARNING":"#ffa94d","OK":"#51cf66","OVERSTOCK":"#adb5bd","WATCH":"#74c0fc"}
-if df_all.empty:
-    st.warning("ไม่พบข้อมูลสินค้า — กรุณารัน run_planning.py ก่อน")
-else:
-    _sc, _fc = st.columns([3,1]) if not IS_MOBILE else (st.container(), None)
-    with _sc:
-        search_q = st.text_input("ค้นหา", placeholder="พิมพ์ชื่อสินค้าหรือ SKU…",
-                                  key="search_q", label_visibility="collapsed")
-    _sal = "ทั้งหมด"
-    if not IS_MOBILE and _fc:
-        with _fc:
-            _sal = st.selectbox("สถานะ",
-                ["ทั้งหมด","CRITICAL","WARNING","OK","OVERSTOCK"],
-                key="srch_al", label_visibility="collapsed")
-    if search_q.strip():
-        _q = search_q.strip()
-        _mask = (df_all["sku_id"].str.contains(_q, case=False, na=False) |
-                 df_all["sku_name"].str.contains(_q, case=False, na=False))
-        if _sal != "ทั้งหมด":
-            _mask &= df_all["alert"] == _sal
-        _hits = df_all[_mask].head(30)
-        if _hits.empty:
-            st.info(f"ไม่พบสินค้าที่ตรงกับ \"{_q}\"")
-        else:
-            st.caption(f"พบ {len(_hits)} รายการ")
-            for _, _row in _hits.iterrows():
-                _sid = str(_row["sku_id"]); _snm = str(_row.get("sku_name",""))
-                _sup = str(_row.get("supplier","")); _uc = float(_row.get("unit_cost",0) or 0)
-                _av = float(_row.get("available",0) or 0); _dos = float(_row.get("days_of_supply",0) or 0)
-                _alv = str(_row.get("alert","")); _ac = _ACOL.get(_alv,"#999")
-                _already = any(c["sku_id"]==_sid for c in st.session_state.get("confirmed",[]))
-                _qk = f"sq_{_sid}"
-                if _qk not in st.session_state:
-                    st.session_state[_qk] = 1
-                st.markdown(
-                    f'''<div style="background:rgba(255,255,255,0.05);border-radius:10px;
-                    padding:10px 14px;margin-bottom:4px;border-left:4px solid {_ac};">
-                    <span style="font-size:14px;font-weight:700;">{_snm}</span>
-                    <span style="font-size:11px;color:#aaa;margin-left:8px;">
-                    SKU {_sid} · {_sup} · คงเหลือ {int(_av)} · DoS {int(_dos)}วัน ·
-                    ฿{_uc:,.2f} · <span style="color:{_ac};font-weight:700;">{_alv}</span>
-                    </span></div>''', unsafe_allow_html=True)
-                _qa, _qb = st.columns([1, 3])
-                with _qa:
-                    _qv = st.number_input("จำนวน", min_value=0, step=1,
-                                          value=st.session_state[_qk],
-                                          key=_qk, label_visibility="collapsed")
-                with _qb:
-                    if _already:
-                        st.success("✅ อยู่ในรายการแล้ว")
-                    elif st.button(f"➕ เพิ่ม {_snm[:25]}", key=f"add_{_sid}"):
-                        if _qv > 0:
-                            st.session_state.setdefault("confirmed", []).append({
-                                "sku_id": _sid, "supplier": _sup,
-                                "unit_cost": _uc, "qty": int(_qv), "sku_name": _snm,
-                            })
-                            st.rerun()
-    else:
-        _n = len(df_all)
-        _nc = (df_all["alert"]=="CRITICAL").sum(); _nw = (df_all["alert"]=="WARNING").sum()
-        _no = (df_all["alert"]=="OK").sum(); _nv = (df_all["alert"]=="OVERSTOCK").sum()
-        st.caption(f"📦 {_n} SKU ทั้งหมด — 🔴 {_nc} · 🟠 {_nw} · 🟢 {_no} · ⚪ {_nv}")
-
-
-def build_po_excel(confirmed_list: list) -> bytes:
+    def build_po_excel(confirmed_list: list) -> bytes:
         from openpyxl import Workbook
 
         wb = Workbook()
